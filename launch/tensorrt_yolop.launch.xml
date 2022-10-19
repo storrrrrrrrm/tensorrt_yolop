@@ -1,0 +1,8 @@
+<launch>
+<arg name="engine_file" default="$(find-pkg-share tensorrt_yolop)/data/yolop-640-640.engine"/>
+<arg name="onnx_file" default="$(find-pkg-share tensorrt_yolop)/data/yolop-640-640.onnx"/>
+<node pkg="tensorrt_yolop" exec="tensorrt_yolop" name="$(anon tensorrt_yolop)" output="screen">
+    <param name="engine_file" type="str" value="$(var engine_file)"/>
+    <param name="onnx_file" type="str" value="$(var onnx_file)"/>
+</node>
+</launch>
