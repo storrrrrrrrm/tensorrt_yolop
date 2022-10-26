@@ -16,6 +16,8 @@ private:
     std::unique_ptr<float[]> out_objs_ = nullptr;
     std::unique_ptr<float[]> out_drive_area_ = nullptr;
     std::unique_ptr<float[]> out_lane_ = nullptr;
+
+    
 };
 
 #endif

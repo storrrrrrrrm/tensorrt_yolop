@@ -27,6 +27,10 @@ public:
             <<",h:"<<bbox[3]<<std::endl;
     }
 
+    bool operator <(const Detection & det) const 
+    {
+		  return conf < det.conf;
+    }
 };
 
 struct Deleter
@@ -77,11 +81,11 @@ public:
   ~YolopNet();
 
   std::vector<float> preprocess(const cv::Mat & img,const int c, const int w, const int h,bool keep_ratio=true);
-  bool detect(const cv::Mat & in_img);
+  bool detect(const cv::Mat & in_img,const std::string result_img_save_path);
   void load(const std::string & path);
   void save(const std::string & path);
-  void post_process(const cv::Mat img,float* out_objs,float* out_drive_area,float* out_lane);
-  void nms(std::vector<Detection>& res, float *output, float conf_thresh, float nms_thresh = 0.5);
+  void post_process(const cv::Mat img,float* out_objs,float* out_drive_area,float* out_lane,const std::string result_img_save_path);
+  void nms(std::vector<Detection>& res, float* out_objs, float conf_thresh, float nms_thresh = 0.5);
 
   void post_process_detection(cv::Mat & img,float* out_objs);
 private:
@@ -119,6 +123,7 @@ private:
 
   float obj_score_thres_ = 0.5;
   float cls_score_thres_ = 0.25;
+  float nms_thres_ = 0.5;
 
   int padw_=0;
   int padh_=0;

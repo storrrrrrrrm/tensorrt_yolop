@@ -2,6 +2,15 @@ cmake_minimum_required(VERSION 3.14)
 
 project(tensorrt_yolop)
 
+find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS
+  serialization
+  thread
+  filesystem
+  regex
+)
+
+
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
@@ -96,7 +105,8 @@ if(TRT_AVAIL AND CUDA_AVAIL AND CUDNN_AVAIL)
         ${CUDA_LIBRARIES}
         ${CUBLAS_LIBRARIES}
         ${CUDNN_LIBRARY}
-        ${OpenCV_LIBS})
+        ${OpenCV_LIBS}
+        ${Boost_LIBRARIES})
 
   ament_auto_package(INSTALL_TO_SHARE
     launch
