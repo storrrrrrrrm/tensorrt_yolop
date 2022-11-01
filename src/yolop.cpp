@@ -209,7 +209,7 @@ std::vector<float> YolopNet::preprocess(const cv::Mat &in_img, const int c, cons
             int neww = w;
             cv::resize(in_img, resized_image, cv::Size(neww, newh), cv::INTER_AREA);
             padh_ = (int)(h - newh) * 0.5; //更新padh_
-            std::cout << "h:" << h << ",newh:" << newh << ",padh:" << padh_ << std::endl;
+            // std::cout << "h:" << h << ",newh:" << newh << ",padh:" << padh_ << std::endl;
             copyMakeBorder(resized_image, resized_image, padh_, h - newh - padh_, 0, 0, cv::BORDER_CONSTANT, 0);
         }
     }
@@ -218,22 +218,20 @@ std::vector<float> YolopNet::preprocess(const cv::Mat &in_img, const int c, cons
         cv::resize(in_img, resized_image, cv::Size(w, h), cv::INTER_AREA);
     }
 
-    cv::imwrite("/home/tensorrt_yolop/test_resized.jpg", resized_image);
+    // cv::imwrite("/home/tensorrt_yolop/test_resized.jpg", resized_image);
 
-    int x = 227, y = 306;
+    // int x = 227, y = 306;
     // python version
     //  bgr order,img[306,227,:]=[68 41 32]
     //  after normalize,img[306,227,:]=[-0.95342064 -1.317927   -1.2467101 ]
     cv::Mat rgb;
     cv::cvtColor(resized_image, rgb, cv::COLOR_BGR2RGB);
 
-    int r = int(rgb.at<cv::Vec3b>(y, x)[0]);
-    int g = int(rgb.at<cv::Vec3b>(y, x)[1]);
-    int b = int(rgb.at<cv::Vec3b>(y, x)[2]);
+    // int r = int(rgb.at<cv::Vec3b>(y, x)[0]);
+    // int g = int(rgb.at<cv::Vec3b>(y, x)[1]);
+    // int b = int(rgb.at<cv::Vec3b>(y, x)[2]);
 
-    std::cout << "r:" << r << ",g:" << g << ",b:" << b << std::endl;
-
-    DEBUG_LINE
+    // std::cout << "r:" << r << ",g:" << g << ",b:" << b << std::endl;
 
     cv::Mat img_float;
     rgb.convertTo(img_float, CV_32FC3, 1 / 255.0);
@@ -250,8 +248,8 @@ std::vector<float> YolopNet::preprocess(const cv::Mat &in_img, const int c, cons
     }
 
     // float* pix_addr = (float*)(img_float.data + (y * img_float.cols * 3  + x * 3));
-    cv::Vec3f bgrPixel = img_float.at<cv::Vec3f>(y, x);
-    std::cout << "normalize:" << bgrPixel << std::endl;
+    // cv::Vec3f bgrPixel = img_float.at<cv::Vec3f>(y, x);
+    // std::cout << "normalize:" << bgrPixel << std::endl;
 
     // HWC TO CHW
     std::vector<cv::Mat> input_channels(c);
@@ -266,29 +264,32 @@ std::vector<float> YolopNet::preprocess(const cv::Mat &in_img, const int c, cons
         data += channel_length;
     }
 
-    for (int i = 0; i < 3; i++)
-    {
-        DEBUG_LINE
-        int index = y * 640 + x + i * 640 * 640;
-        //   std::cout<<"index:"<<index<<std::endl;
-        std::cout << "value is:" << result[index] << std::endl;
-    }
+    // for (int i = 0; i < 3; i++)
+    // {
+    //     DEBUG_LINE
+    //     int index = y * 640 + x + i * 640 * 640;
+    //     //   std::cout<<"index:"<<index<<std::endl;
+    //     // std::cout << "value is:" << result[index] << std::endl;
+    // }
 
     return result;
 }
 
 bool YolopNet::detect(const cv::Mat &in_img,const std::string result_img_save_path)
 {
-    DEBUG_LINE
+    auto start =  std::chrono::high_resolution_clock::now();
+    auto end = std::chrono::high_resolution_clock::now();
+    auto int_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
     auto dims = engine_->getBindingDimensions(0);
     model_input_c_ = dims.d[1];
     model_input_h_ = dims.d[2];
     model_input_w_ = dims.d[3];
     std::vector<float> input = preprocess(in_img, model_input_c_, model_input_w_, model_input_h_);
-    std::cout << "input size:" << input.size() << std::endl;
+    // std::cout << "input size:" << input.size() << std::endl;
     CHECK_CUDA_ERROR(
         cudaMemcpy(input_d_.get(), input.data(), input.size() * sizeof(float), cudaMemcpyHostToDevice));
-    DEBUG_LINE
+
     std::vector<void *> buffers = {
         input_d_.get(), out_objs_d_.get(), out_drive_area_d_.get(), out_lane_d_.get()};
     try
@@ -321,28 +322,42 @@ bool YolopNet::detect(const cv::Mat &in_img,const std::string result_img_save_pa
         stream_));
     cudaStreamSynchronize(stream_);
 
-    post_process(in_img, out_objs_.get(), out_drive_area_.get(), out_lane_.get(),result_img_save_path);
+    end = std::chrono::high_resolution_clock::now();
+    int_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout<<"inference fps:"<<(1000/int_ms.count())<<std::endl;
 
+    post_process(in_img, out_objs_.get(), out_drive_area_.get(), out_lane_.get(),result_img_save_path);
+    
+    end = std::chrono::high_resolution_clock::now();
+    int_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout<<"inference+postprocess fps:"<<(1000/int_ms.count())<<std::endl;
+    
     return true;
 }
 
 void YolopNet::post_process(const cv::Mat img, float *out_objs, float *out_drive_area, float *out_lane,const std::string result_img_save_path)
 {
-    cv::Mat outimg = img.clone();
+    // cv::Mat outimg = img.clone();
+    cv::Mat outimg = img;//浅拷贝 节省时间
     float ratioh = 1.0 * model_input_h_ / img.rows;
     float ratiow = 1.0 * model_input_w_ / img.cols;
-    std::cout << "ratioh=" << ratioh << ",ratiow=" << ratiow << std::endl;
+    float r = ratioh; //判断前处理在缩放成640*640时缩放的比例
+    if(ratiow < ratioh)
+    {
+        r = ratiow;
+    }
+    // std::cout << "ratioh=" << ratioh << ",ratiow=" << ratiow << std::endl;
     int area = model_input_h_ * model_input_w_;
 
     // debug
-    int x = 30;
-    int y = 400;
-    int index1 = y * 640 + x;
-    int index2 = 640 * 640 + y * 640 + x;
-    float p1 = out_drive_area[index1];
-    float p2 = out_drive_area[index2];
-    std::cout << "p1:" << p1 << std::endl;
-    std::cout << "p2:" << p2 << std::endl;
+    // int x = 30;
+    // int y = 400;
+    // int index1 = y * 640 + x;
+    // int index2 = 640 * 640 + y * 640 + x;
+    // float p1 = out_drive_area[index1];
+    // float p2 = out_drive_area[index2];
+    // std::cout << "p1:" << p1 << std::endl;
+    // std::cout << "p2:" << p2 << std::endl;
 
     //可行驶区域及车道线
     for (int y = 0; y < outimg.rows; y++)
@@ -353,8 +368,8 @@ void YolopNet::post_process(const cv::Mat img, float *out_objs, float *out_drive
             // int x_in_ouput = static_cast<int>(x / ratiow);
             // int y_in_output = static_cast<int>(y / ratioh);
             //原始图像上的x,y对应到模型输出上的x,y
-            int x_in_ouput = int(x * ratiow) + padw_;
-            int y_in_output = int(y * ratiow) + padh_;
+            int x_in_ouput = int(x * r) + padw_;
+            int y_in_output = int(y * r) + padh_;
 
             //输出相对输入尺寸未进行下采样 640x640输入,输出依然是640x640
             float p1 = out_drive_area[y_in_output * model_input_w_ + x_in_ouput];
@@ -381,8 +396,11 @@ void YolopNet::post_process(const cv::Mat img, float *out_objs, float *out_drive
     //处理box
     post_process_detection(outimg, out_objs);
 
-    cv::imwrite(result_img_save_path, outimg);
-    
+    if(!result_img_save_path.empty())
+    {
+        // std::cout<<"save to "<<result_img_save_path<<std::endl;
+        cv::imwrite(result_img_save_path, outimg);
+    }
 }
 
 void YolopNet::post_process_detection(cv::Mat &img, float *out_objs)
@@ -406,8 +424,8 @@ void YolopNet::post_process_detection(cv::Mat &img, float *out_objs)
         int top = int((cy - h / 2 - padh_) / r);
         int bottom = int((cy + h / 2 - padh_) / r);
 
-        std::cout << "cx:" << cx << ",w:" << w << ",padw_:" << padw_ << ",r:" << r << std::endl;
-        std::cout << "left:" << left << ",top:" << top << ",right:" << right << ",bottom:" << bottom << std::endl;
+        // std::cout << "cx:" << cx << ",w:" << w << ",padw_:" << padw_ << ",r:" << r << std::endl;
+        // std::cout << "left:" << left << ",top:" << top << ",right:" << right << ",bottom:" << bottom << std::endl;
         cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(0, 0, 255), 2);
         
     }

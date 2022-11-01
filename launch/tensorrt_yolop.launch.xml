@@ -1,8 +1,12 @@
 <launch>
 <arg name="engine_file" default="$(find-pkg-share tensorrt_yolop)/data/yolop-640-640.engine"/>
 <arg name="onnx_file" default="$(find-pkg-share tensorrt_yolop)/data/yolop-640-640.onnx"/>
+<arg name="input_topic" default="/image_raw"/>
+<arg name="output_topic" default="/result_image_raw"/>
 <node pkg="tensorrt_yolop" exec="tensorrt_yolop" name="$(anon tensorrt_yolop)" output="screen">
     <param name="engine_file" type="str" value="$(var engine_file)"/>
     <param name="onnx_file" type="str" value="$(var onnx_file)"/>
+    <remap from="in/image" to="$(var input_topic)"/>
+    <remap from="out/image" to="$(var output_topic)"/>
 </node>
 </launch>
