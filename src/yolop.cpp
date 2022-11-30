@@ -2,28 +2,13 @@
 
 #include <NvOnnxParser.h>
 
+#include <fstream>
 #include <memory>
 #include <numeric>
 
 #define DEBUG_LINE std::cout << __FILE__ << "," << __LINE__ << std::endl;
 
 static int MAX_BOX_COUNT = 25200;
-
-// struct alignas(float) Detection {
-//     //center_x center_y w h
-//     float bbox[4];
-//     float conf;  // bbox_conf * cls_conf
-//     float class_id;
-
-//     void print()
-//     {
-//         std::cout<<"conf:"<<conf<<std::endl;
-//         std::cout<<"c_x:"<<bbox[0]
-//             <<",c_y:"<<bbox[1]
-//             <<",w:"<<bbox[2]
-//             <<",h:"<<bbox[3]<<std::endl;
-//     }
-// };
 
 YolopNet::YolopNet(const std::string &engine_path, bool verbose)
 {
@@ -278,6 +263,7 @@ std::vector<float> YolopNet::preprocess(const cv::Mat &in_img, const int c, cons
 bool YolopNet::detect(const cv::Mat &in_img,const std::string result_img_save_path)
 {
     auto start =  std::chrono::high_resolution_clock::now();
+    auto compute_start = std::chrono::high_resolution_clock::now();
     auto end = std::chrono::high_resolution_clock::now();
     auto int_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
@@ -301,8 +287,13 @@ bool YolopNet::detect(const cv::Mat &in_img,const std::string result_img_save_pa
         auto input_dims = engine_->getBindingDimensions(0);
         int batch_size = 1;
         context_->setBindingDimensions(0, nvinfer1::Dims4(batch_size, input_dims.d[1], input_dims.d[2], input_dims.d[3]));
+
+        compute_start  =  std::chrono::high_resolution_clock::now();
         context_->enqueueV2(buffers.data(), stream_, nullptr);
         cudaStreamSynchronize(stream_);
+        end = std::chrono::high_resolution_clock::now();
+        int_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - compute_start);
+        std::cout<<"inference fps:"<<(1000/int_ms.count())<<std::endl;
     }
     catch (const std::runtime_error &e)
     {
@@ -322,15 +313,11 @@ bool YolopNet::detect(const cv::Mat &in_img,const std::string result_img_save_pa
         stream_));
     cudaStreamSynchronize(stream_);
 
-    end = std::chrono::high_resolution_clock::now();
-    int_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout<<"inference fps:"<<(1000/int_ms.count())<<std::endl;
-
     post_process(in_img, out_objs_.get(), out_drive_area_.get(), out_lane_.get(),result_img_save_path);
     
     end = std::chrono::high_resolution_clock::now();
     int_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout<<"inference+postprocess fps:"<<(1000/int_ms.count())<<std::endl;
+    std::cout<<"total frame process:"<<(1000/int_ms.count())<<std::endl;
     
     return true;
 }
@@ -348,16 +335,6 @@ void YolopNet::post_process(const cv::Mat img, float *out_objs, float *out_drive
     }
     // std::cout << "ratioh=" << ratioh << ",ratiow=" << ratiow << std::endl;
     int area = model_input_h_ * model_input_w_;
-
-    // debug
-    // int x = 30;
-    // int y = 400;
-    // int index1 = y * 640 + x;
-    // int index2 = 640 * 640 + y * 640 + x;
-    // float p1 = out_drive_area[index1];
-    // float p2 = out_drive_area[index2];
-    // std::cout << "p1:" << p1 << std::endl;
-    // std::cout << "p2:" << p2 << std::endl;
 
     //可行驶区域及车道线
     for (int y = 0; y < outimg.rows; y++)

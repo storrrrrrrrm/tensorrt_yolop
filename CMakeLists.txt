@@ -2,18 +2,6 @@ cmake_minimum_required(VERSION 3.14)
 
 project(tensorrt_yolop)
 
-find_package(Boost REQUIRED)
-find_package(Boost REQUIRED COMPONENTS
-  serialization
-  thread
-  filesystem
-  regex
-)
-
-
-find_package(ament_cmake_auto REQUIRED)
-ament_auto_find_build_dependencies()
-
 option(CUDA_USE_STATIC_CUDA_RUNTIME OFF)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_BUILD_TYPE Debug)
@@ -97,7 +85,7 @@ if(TRT_AVAIL AND CUDA_AVAIL AND CUDNN_AVAIL)
     ${PROJECT_SOURCE_DIR}/src/main.cpp
   )
 
-  ament_auto_add_executable(tensorrt_yolop ${SOURCE_FILE})
+  add_executable(tensorrt_yolop ${SOURCE_FILE})
   target_link_libraries(tensorrt_yolop 
         ${NVINFER}
         ${NVONNXPARSER}
@@ -107,27 +95,8 @@ if(TRT_AVAIL AND CUDA_AVAIL AND CUDNN_AVAIL)
         ${CUDNN_LIBRARY}
         ${OpenCV_LIBS}
         ${Boost_LIBRARIES})
-
-  ament_auto_package(INSTALL_TO_SHARE
-    launch
-    data
-  )
-  
-  install(
-    TARGETS
-      tensorrt_yolop
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-  )
-
 else()
   message("TensorrtYolo won't be built, CUDA and/or TensorRT were not found.")
-  ament_auto_package(INSTALL_TO_SHARE
-    config
-    data
-    launch
-  )
 endif()
 
 

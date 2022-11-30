@@ -3,14 +3,15 @@
 
 int main(int argc,char** argv)
 {
-    rclcpp::init(argc, argv);
-
-    rclcpp::NodeOptions options;
+    std::string onnx_path = "../data/yolop-640-640.onnx";
+    std::string engine_path = "../data/yolop.engine";
+    std::shared_ptr<TensorrtYolopNode> node = std::make_shared<TensorrtYolopNode>(engine_path,onnx_path);
     
-    std::shared_ptr<TensorrtYolopNode> node = std::make_shared<TensorrtYolopNode>(options);
-    node->detect_test_on_dir();
+    cv::Mat img = cv::imread("../test.jpg");
+    for(int i = 0;i<50;i++)
+    {
+        node->detect_on_img(img,"../test_result.jpg");
+    }
 
-    rclcpp::spin(node);
-    rclcpp::shutdown();
     return 0;
 }
